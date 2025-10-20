@@ -4,7 +4,7 @@
 #include <sndfile.h>
 
 #define SAMPLE_RATE (44100)
-#define RECORD_LENGTH (5)
+#define RECORD_LENGTH (10)
 #define CHANNELS (1)
 #define FRAMES_PER_BUFFER (512)
 
@@ -73,7 +73,6 @@ int main(){
         int framesToRead = (totalFrames - framesRead > FRAMES_PER_BUFFER) ? FRAMES_PER_BUFFER : totalFrames - framesRead;
         Pa_ReadStream(stream, recordedSamples + framesRead, framesToRead);
         framesRead += framesToRead;
-        printf("framesToRead: %d and framesRead: %d\r\n", framesToRead, framesRead);
     }
     printf("Recording finished.\n");
 
