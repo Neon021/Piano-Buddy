@@ -22,6 +22,7 @@ int main(){
     recordedSamples = (float *) malloc(numBytes);
     if(recordedSamples == NULL){
         printf("Could not allocate memory for audio\r\n");
+        if (recordedSamples) free(recordedSamples);
         return -1;
     }
     else{
@@ -36,6 +37,9 @@ int main(){
     err = Pa_Initialize();
     if(err != paNoError){
         printf("Could not initialize PortAudio!\r\n");
+        PaErrorCode errCode = (PaErrorCode) err;
+        printf("Error code: %s", Pa_GetErrorText(err));
+        if (recordedSamples) free(recordedSamples);
         return -1;
     }
     else{
@@ -47,7 +51,8 @@ int main(){
     if(err != paNoError){
         printf("Could not open the audio stream!\r\n");
         PaErrorCode errCode = (PaErrorCode) err;
-        printf("Error code: %d", errCode);
+        printf("Error code: %s", Pa_GetErrorText(err));
+        if (recordedSamples) free(recordedSamples);
         return -1;
     }
     else{
@@ -59,7 +64,8 @@ int main(){
     if(err != paNoError){
         printf("Could not start the audio stream!\r\n");
         PaErrorCode errCode = (PaErrorCode) err;
-        printf("Error code: %d", errCode);
+        printf("Error code: %s", Pa_GetErrorText(err));
+        if (recordedSamples) free(recordedSamples);
         return -1;
     }
     else{
@@ -82,7 +88,8 @@ int main(){
     if(err != paNoError){
         printf("Could not stop the audio stream!\r\n");
         PaErrorCode errCode = (PaErrorCode) err;
-        printf("Error code: %d", errCode);
+        printf("Error code: %s", Pa_GetErrorText(err));
+        if (recordedSamples) free(recordedSamples);
         return -1;
     }
     else{
@@ -93,7 +100,8 @@ int main(){
     if(err != paNoError){
         printf("Could not close the audio stream!\r\n");
         PaErrorCode errCode = (PaErrorCode) err;
-        printf("Error code: %d", errCode);
+        printf("Error code: %s", Pa_GetErrorText(err));
+        if (recordedSamples) free(recordedSamples);
         return -1;
     }
     else{
