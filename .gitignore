@@ -1,0 +1,14 @@
+# Executables and binaries in the bin folder
+/bin/
+
+# Object files generated during compilation
+src/*.o
+
+# Local configuration file containing secrets
+config.h
+
+# VS Code specific files
+.vscode/
+
+# Any WAV files
+*.wav
