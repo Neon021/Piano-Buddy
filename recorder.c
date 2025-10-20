@@ -32,6 +32,7 @@ int main(){
         recordedSamples[i] = 0.0f;
     }
 
+    //INITIALIZE PORTAUDIO
     err = Pa_Initialize();
     if(err != paNoError){
         printf("Could not initialize PortAudio!\r\n");
@@ -40,6 +41,41 @@ int main(){
     else{
         printf("Successfully initialized PortAudio!\r\n");
     }
+
+    //OPEN THE AUDIO STREAM
+    err = Pa_OpenDefaultStream(&stream, CHANNELS, 0, paFloat32, SAMPLE_RATE, FRAMES_PER_BUFFER, NULL, NULL);
+    if(err != paNoError){
+        printf("Could not open the audio stream!\r\n");
+        PaErrorCode errCode = (PaErrorCode) err;
+        printf("Error code: %d", errCode);
+        return -1;
+    }
+    else{
+        printf("Successfully opened the audio stream!\r\n");
+    }
+
+    //START RECORDING
+    err = Pa_StartStream(stream);
+    if(err != paNoError){
+        printf("Could not start the audio stream!\r\n");
+        PaErrorCode errCode = (PaErrorCode) err;
+        printf("Error code: %d", errCode);
+        return -1;
+    }
+    else{
+        printf("Successfully started the audio stream!\r\n");
+    }
+
+    printf("🎤 Now recording for %d seconds... Say something!\r\n", RECORD_LENGTH);
+    int totalFrames = RECORD_LENGTH * SAMPLE_RATE;
+    int framesRead = 0;
+    while(framesRead < totalFrames){
+        int framesToRead = (totalFrames - framesRead > FRAMES_PER_BUFFER) ? FRAMES_PER_BUFFER : totalFrames - framesRead;
+        Pa_ReadStream(stream, recordedSamples + framesRead, framesToRead);
+        framesRead += framesToRead;
+        printf("framesToRead: %d and framesRead: %d\r\n", framesToRead, framesRead);
+    }
+    printf("Recording finished.\n");
 
     return 0;
 }

@@ -124,7 +124,7 @@ typedef enum PaErrorCode
     paNoError = 0,
 
     paNotInitialized = -10000,
-    paUnanticipatedHostError,
+    paUnanticipatedHostError = -9999,
     paInvalidChannelCount,
     paInvalidSampleRate,
     paInvalidDevice,
