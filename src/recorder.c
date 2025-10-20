@@ -4,7 +4,7 @@
 #include <sndfile.h>
 
 #define SAMPLE_RATE (44100)
-#define RECORD_LENGTH (5)
+#define RECORD_LENGTH (10)
 #define CHANNELS (1)
 #define FRAMES_PER_BUFFER (512)
 
