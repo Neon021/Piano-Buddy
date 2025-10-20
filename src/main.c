@@ -91,13 +91,13 @@ int main(){
 
     err = Pa_CloseStream(stream);
     if(err != paNoError){
-        printf("Could not stop the audio stream!\r\n");
+        printf("Could not close the audio stream!\r\n");
         PaErrorCode errCode = (PaErrorCode) err;
         printf("Error code: %d", errCode);
         return -1;
     }
     else{
-        printf("Successfully stopped the audio stream!\r\n");
+        printf("Successfully closed the audio stream!\r\n");
     }
     Pa_Terminate();
 
