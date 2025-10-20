@@ -2,32 +2,44 @@ CC = gcc
 
 CFLAGS = -Wall -Iinclude -g
 
-LDFLAGS = -lportaudio -lsndfile
+REC_APP = bin/record_app
+ANALYZE_APP = bin/analyze_app
 
-EXECUTABLE=bin/piano_buddy
+REC_SRC = src/recorder.c
+REC_OBJ = $(REC_SRC:.c=.o)
 
-SOURCES=$(wildcard src/*.c)
+ANALYZE_SRC = src/analyzer.c
+ANALYZE_OBJ = $(ANALYZE_SRC:.c=.o)
 
-OBJECTS=$(SOURCES:.c=.o)
+# Base libs for both
+LDFLAGS_BASE = -lportaudio -lsndfile
+# Libs needed only for the analyzer
+# -lfftw3 is for the FFTW library
+# -lm is the math library (for sqrt())
+LDFLAGS_ANALYZE = $(LDFLAGS_BASE) -lfftw3 -lm
 
-# 3. Build Rules
-# The first rule is the default one that runs when you just type 'make'
-all: $(EXECUTABLE)
+# Build Rules
+# 'all' is the default rule. It now builds both apps.
+all: $(REC_APP) $(ANALYZE_APP)
 
-# Rule to create the final executable
-$(EXECUTABLE): $(OBJECTS)
-	@echo "Linking..."
-	$(CC) $(OBJECTS) -o $(EXECUTABLE) $(LDFLAGS)
-	@echo "Build finished. Run with: ./$(EXECUTABLE)"
+# Rule to build the recorder
+$(REC_APP): $(REC_OBJ)
+	@echo "Linking Recorder..."
+	$(CC) $(REC_OBJ) -o $(REC_APP) $(LDFLAGS_BASE)
+	@echo "Recorder build finished: $(REC_APP)"
 
-# Rule to compile .c source files into .o object files
-# $< is the source file name (e.g., src/main.c)
-# $@ is the target file name (e.g., src/main.o)
+# Rule to build the analyzer
+$(ANALYZE_APP): $(ANALYZE_OBJ)
+	@echo "Linking Analyzer..."
+	$(CC) $(ANALYZE_OBJ) -o $(ANALYZE_APP) $(LDFLAGS_ANALYZE)
+	@echo "Analyzer build finished: $(ANALYZE_APP)"
+
+# Generic rule to compile any .c file in src/ into its .o file
 src/%.o: src/%.c
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Rule to clean up compiled files
+# Rule to clean up
 clean:
 	@echo "Cleaning up..."
-	rm -f src/*.o $(EXECUTABLE)
+	rm -f src/*.o $(REC_APP) $(ANALYZE_APP)
