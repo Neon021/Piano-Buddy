@@ -77,5 +77,56 @@ int main(){
     }
     printf("Recording finished.\n");
 
+    //STOP RECORDING
+    err = Pa_StopStream(stream);
+    if(err != paNoError){
+        printf("Could not stop the audio stream!\r\n");
+        PaErrorCode errCode = (PaErrorCode) err;
+        printf("Error code: %d", errCode);
+        return -1;
+    }
+    else{
+        printf("Successfully stopped the audio stream!\r\n");
+    }
+
+    err = Pa_CloseStream(stream);
+    if(err != paNoError){
+        printf("Could not stop the audio stream!\r\n");
+        PaErrorCode errCode = (PaErrorCode) err;
+        printf("Error code: %d", errCode);
+        return -1;
+    }
+    else{
+        printf("Successfully stopped the audio stream!\r\n");
+    }
+    Pa_Terminate();
+
+
+    //SAVE TO FILE
+    printf("💾 Saving recording to 'recording.wav'...\n");
+    SF_INFO sfInfo;
+    sfInfo.samplerate = SAMPLE_RATE;
+    sfInfo.channels = CHANNELS;
+    sfInfo.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // WAV format, 32-bit float
+
+    SNDFILE *outFile = sf_open("recording.wav", SFM_WRITE, &sfInfo);
+    if (!outFile) {
+        printf("Error opening output file: %s\r\n", sf_strerror(NULL));
+        free(recordedSamples);
+        return 1;
+    }
+
+    sf_count_t count = sf_write_float(outFile, recordedSamples, numSamples);
+    if(count!=numSamples){
+        printf("Error writing to file. Wrote %ld frames, expected %d\n", count, numSamples);
+    }
+    
+    // Close the file
+    sf_close(outFile);
+    
+    // Free the memory we allocated
+    free(recordedSamples);
+
+    printf("Done!\n");
     return 0;
 }
