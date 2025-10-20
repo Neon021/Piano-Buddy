@@ -1,0 +1,10 @@
+// src/config.h.example
+// Copy this file to config.h and fill in your actual credentials.
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+const char* access_key = "YOUR_ACCESS_KEY_HERE";
+const char* access_secret = "YOUR_ACCESS_SECRET_HERE";
+
+#endif // CONFIG_H

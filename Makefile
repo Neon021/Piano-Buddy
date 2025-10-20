@@ -2,32 +2,40 @@ CC = gcc
 
 CFLAGS = -Wall -Iinclude -g
 
-LDFLAGS = -lportaudio -lsndfile
+REC_APP = bin/record_app
+RECOGNIZE_APP = bin/recognize_app
 
-EXECUTABLE=bin/piano_buddy
+REC_SRC = src/recorder.c
+REC_OBJ = $(REC_SRC:.c=.o)
 
-SOURCES=$(wildcard src/*.c)
+RECOGNIZE_SRC = src/recognizer.c
+RECOGNIZE_OBJ = $(RECOGNIZE_SRC:.c=.o)
 
-OBJECTS=$(SOURCES:.c=.o)
+LDFLAGS_REC = -lportaudio -lsndfile
+# Link against curl, ssl, crypto (for openssl), and jansson
+LDFLAGS_RECOGNIZE = -lcurl -lssl -lcrypto -ljansson
 
-# 3. Build Rules
-# The first rule is the default one that runs when you just type 'make'
-all: $(EXECUTABLE)
+# Build Rules
+all: $(REC_APP) $(RECOGNIZE_APP)
 
-# Rule to create the final executable
-$(EXECUTABLE): $(OBJECTS)
-	@echo "Linking..."
-	$(CC) $(OBJECTS) -o $(EXECUTABLE) $(LDFLAGS)
-	@echo "Build finished. Run with: ./$(EXECUTABLE)"
+# Rule to build the recorder
+$(REC_APP): $(REC_OBJ)
+	@echo "Linking Recorder..."
+	$(CC) $(REC_OBJ) -o $(REC_APP) $(LDFLAGS_REC)
+	@echo "Recorder build finished: $(REC_APP)"
 
-# Rule to compile .c source files into .o object files
-# $< is the source file name (e.g., src/main.c)
-# $@ is the target file name (e.g., src/main.o)
+# Rule to build the recognizer
+$(RECOGNIZE_APP): $(RECOGNIZE_OBJ)
+	@echo "Linking Recognizer..."
+	$(CC) $(RECOGNIZE_OBJ) -o $(RECOGNIZE_APP) $(LDFLAGS_RECOGNIZE)
+	@echo "Recognizer build finished: $(RECOGNIZE_APP)"
+
+# Generic rule to compile any .c file in src/ into its .o file
 src/%.o: src/%.c
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Rule to clean up compiled files
+# Rule to clean up
 clean:
 	@echo "Cleaning up..."
-	rm -f src/*.o $(EXECUTABLE)
+	rm -f src/*.o $(REC_APP) $(RECOGNIZE_APP)
