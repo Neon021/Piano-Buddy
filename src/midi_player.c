@@ -1,12 +1,7 @@
 #include <stdio.h>
 #include <fluidsynth.h>
 
-int main(int argc, char** argv) {
-    if (argc < 3) {
-        printf("Usage: %s [soundfont.sf3] [midi_file.mid]\n", argv[0]);
-        return -1;
-    }
-
+int play_midi_muted(const char *soundfont, const char *midi_file) {
     fluid_settings_t* settings;
     fluid_synth_t* synth;
     fluid_player_t* player;
@@ -19,8 +14,8 @@ int main(int argc, char** argv) {
     adriver = new_fluid_audio_driver(settings, synth);
 
 
-    if (fluid_synth_sfload(synth, argv[1], 1) == FLUID_FAILED) {
-        printf("Error: Failed to load the SoundFont file: %s\n", argv[1]);
+    if (fluid_synth_sfload(synth, soundfont, 1) == FLUID_FAILED) {
+        printf("Error: Failed to load the SoundFont file: %s\n", soundfont);
         goto cleanup;
     }
     printf("🎹 SoundFont loaded successfully.\n");
@@ -29,8 +24,8 @@ int main(int argc, char** argv) {
     player = new_fluid_player(synth);
     
     // Add the MIDI file to the player's playlist
-    if (fluid_player_add(player, argv[2]) == FLUID_FAILED) {
-        printf("Error: Failed to add MIDI file: %s\n", argv[2]);
+    if (fluid_player_add(player, midi_file) == FLUID_FAILED) {
+        printf("Error: Failed to add MIDI file: %s\n", midi_file);
         goto cleanup;
     }
     printf("🎵 MIDI file added to playlist.\n");

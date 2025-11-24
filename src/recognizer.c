@@ -59,13 +59,7 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb, void *us
     return realsize;
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <audio_file.wav>\n", argv[0]);
-        return 1;
-    }
-    char *file_path = argv[1];
-
+char* identify_song(const char *filename) {
     //PREPARE SIGNATURE
     char http_method[] = "POST";
     char http_uri[] = "/v1/identify";
@@ -100,8 +94,8 @@ int main(int argc, char *argv[]) {
     }
     
     struct stat file_info;
-    if (stat(file_path, &file_info) != 0) {
-        fprintf(stderr, "Error getting file stats for %s\n", file_path);
+    if (stat(filename, &file_info) != 0) {
+        fprintf(stderr, "Error getting file stats for %s\n", filename);
         return 1;
     }
     char sample_bytes_str[20];
@@ -110,7 +104,7 @@ int main(int argc, char *argv[]) {
     struct curl_httppost *formpost = NULL;
     struct curl_httppost *lastptr = NULL;
 
-    curl_formadd(&formpost, &lastptr, CURLFORM_COPYNAME, "sample", CURLFORM_FILE, file_path, CURLFORM_END);
+    curl_formadd(&formpost, &lastptr, CURLFORM_COPYNAME, "sample", CURLFORM_FILE, filename, CURLFORM_END);
     curl_formadd(&formpost, &lastptr, CURLFORM_COPYNAME, "access_key", CURLFORM_COPYCONTENTS, access_key, CURLFORM_END);
     curl_formadd(&formpost, &lastptr, CURLFORM_COPYNAME, "sample_bytes", CURLFORM_COPYCONTENTS, sample_bytes_str, CURLFORM_END);
     curl_formadd(&formpost, &lastptr, CURLFORM_COPYNAME, "timestamp", CURLFORM_COPYCONTENTS, timestamp_str, CURLFORM_END);
@@ -166,12 +160,18 @@ int main(int argc, char *argv[]) {
                     printf("Title:  %s\n", title);
                     printf("Artist: %s\n", artist);
                     printf("------------------------\n");
-                } else {
+                    char* found_title = strdup(title);
+                    return found_title;
+                } 
+                else {
                     printf("--- 🤷 No Match Found ---\n");
+                    return NULL;
                 }
-            } else {
+            } 
+            else {
                 printf("--- ❌ Error from API ---\n");
                 printf("Message: %s\n", msg);
+                return NULL;
             }
             json_decref(root);
         }
@@ -183,5 +183,5 @@ int main(int argc, char *argv[]) {
     curl_formfree(formpost);
     curl_global_cleanup();
 
-    return 0;
+    return NULL;
 }

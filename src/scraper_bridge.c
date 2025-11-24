@@ -39,23 +39,3 @@ char* get_midi_url_from_python(const char* query) {
 
     return result_url;
 }
-
-// --- Simple Main to Test It ---
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        printf("Usage: %s \"Song Name\"\n", argv[0]);
-        return 1;
-    }
-
-    printf("Calling Python to find: %s...\n", argv[1]);
-    char* url = get_midi_url_from_python(argv[1]);
-
-    if (url) {
-        printf("Success! URL found: %s\n", url);
-        free(url);
-    } else {
-        printf("Failed to find MIDI URL.\n");
-    }
-
-    return 0;
-}

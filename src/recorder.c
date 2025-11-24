@@ -4,18 +4,17 @@
 #include <sndfile.h>
 
 #define SAMPLE_RATE (44100)
-#define RECORD_LENGTH (10)
 #define CHANNELS (1)
 #define FRAMES_PER_BUFFER (512)
 
-int main(){
+int record_audio(const char *filename, int seconds){
     printf("Starting audio recording..\r\n");
 
     //SETUP
     PaStream *stream;
     PaError err;
     float *recordedSamples;
-    int numSamples = SAMPLE_RATE * RECORD_LENGTH;
+    int numSamples = SAMPLE_RATE * seconds;
     int numBytes = numSamples * sizeof(float);
 
     //ALLOCATE MEMORY TO SAVE RECORDED SAMPLES
@@ -66,8 +65,8 @@ int main(){
         printf("Successfully started the audio stream!\r\n");
     }
 
-    printf("🎤 Now recording for %d seconds... Say something!\r\n", RECORD_LENGTH);
-    int totalFrames = RECORD_LENGTH * SAMPLE_RATE;
+    printf("🎤 Now recording for %d seconds... Say something!\r\n", seconds);
+    int totalFrames = seconds * SAMPLE_RATE;
     int framesRead = 0;
     while(framesRead < totalFrames){
         int framesToRead = (totalFrames - framesRead > FRAMES_PER_BUFFER) ? FRAMES_PER_BUFFER : totalFrames - framesRead;
@@ -108,7 +107,7 @@ int main(){
     sfInfo.channels = CHANNELS;
     sfInfo.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // WAV format, 32-bit float
 
-    SNDFILE *outFile = sf_open("recording.wav", SFM_WRITE, &sfInfo);
+    SNDFILE *outFile = sf_open(&filename, SFM_WRITE, &sfInfo);
     if (!outFile) {
         printf("Error opening output file: %s\r\n", sf_strerror(NULL));
         free(recordedSamples);
