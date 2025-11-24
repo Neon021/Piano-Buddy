@@ -43,9 +43,23 @@ def get_midi_url(query):
                         break
 
         if link and link.get('href'):
-            return base_url + link.get('href')
+            # --- Go to the song page and find the actual .mid file ---
+            full_song_page_url = base_url + link.get('href')
+
+            # Request the song page
+            response_page = requests.get(full_song_page_url, headers=headers)
+            response_page.raise_for_status()
+            soup_page = BeautifulSoup(response_page.text, 'html.parser')
+
+            # Find the download link.
+            download_link = soup_page.find('a', href=lambda href: href and "/uploads/" in href and href.endswith(".mid"))
+
+            if download_link:
+                return base_url + download_link.get('href')
+        
+            return "NOT_FOUND"
         else:
-            dump_html() # Save the file so you can inspect it!
+            dump_html() # Save the file to inspect!
             return "NOT_FOUND"
 
     except Exception as e:
