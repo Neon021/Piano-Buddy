@@ -90,13 +90,13 @@ char* identify_song(const char *filename) {
 
     if (!curl) {
         fprintf(stderr, "Error initializing curl\n");
-        return 1;
+        return NULL;
     }
     
     struct stat file_info;
     if (stat(filename, &file_info) != 0) {
         fprintf(stderr, "Error getting file stats for %s\n", filename);
-        return 1;
+        return NULL;
     }
     char sample_bytes_str[20];
     sprintf(sample_bytes_str, "%ld", file_info.st_size);
@@ -137,6 +137,7 @@ char* identify_song(const char *filename) {
         
         json_error_t error;
         json_t *root = json_loads(chunk.memory, 0, &error);
+        printf("Dumping ACRCloud Http response: %s\r\n", chunk.memory);
 
         if (!root) {
             fprintf(stderr, "error: on line %d: %s\n", error.line, error.text);

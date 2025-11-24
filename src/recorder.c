@@ -107,7 +107,7 @@ int record_audio(const char *filename, int seconds){
     sfInfo.channels = CHANNELS;
     sfInfo.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; // WAV format, 32-bit float
 
-    SNDFILE *outFile = sf_open(&filename, SFM_WRITE, &sfInfo);
+    SNDFILE *outFile = sf_open(filename, SFM_WRITE, &sfInfo);
     if (!outFile) {
         printf("Error opening output file: %s\r\n", sf_strerror(NULL));
         free(recordedSamples);
