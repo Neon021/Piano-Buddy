@@ -6,6 +6,7 @@ CFLAGS = -Wall -Iinclude -g
 REC_APP = bin/record_app
 RECOGNIZE_APP = bin/recognize_app
 MIDI_APP = bin/midi_player_app
+BRIDGE_APP = bin/bridge_app
 
 # 3. Source & Object files
 REC_SRC = src/recorder.c
@@ -16,6 +17,9 @@ RECOGNIZE_OBJ = $(RECOGNIZE_SRC:.c=.o)
 
 MIDI_SRC = src/midi_player.c
 MIDI_OBJ = $(MIDI_SRC:.c=.o)
+
+BRIDGE_SRC = src/scraper_bridge.c
+BRIDGE_OBJ = $(BRIDGE_SRC:.c=.o)
 
 # 4. Linker Flags (Libraries)
 LDFLAGS_REC = -lportaudio -lsndfile
@@ -42,6 +46,12 @@ $(MIDI_APP): $(MIDI_OBJ)
 	@echo "Linking MIDI Player..."
 	$(CC) $(MIDI_OBJ) -o $(MIDI_APP) $(LDFLAGS_MIDI)
 	@echo "MIDI Player build finished: $(MIDI_APP)"
+
+#Rule to build scraper bridge
+$(BRIDGE_APP): $(BRIDGE_OBJ)
+	@echo "Linking Bridge..."
+	$(CC) $(BRIDGE_OBJ) -o $(BRIDGE_APP)
+	@echo "Bridge built."
 
 # Generic rule to compile any .c file in src/ into its .o file
 src/%.o: src/%.c
