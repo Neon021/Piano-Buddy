@@ -1,64 +1,37 @@
-# 1. Compiler
 CC = gcc
 CFLAGS = -Wall -Iinclude -g
 
-# 2. Executables
-REC_APP = bin/record_app
-RECOGNIZE_APP = bin/recognize_app
-MIDI_APP = bin/midi_player_app
-BRIDGE_APP = bin/bridge_app
+APP = bin/piano_buddy
 
-# 3. Source & Object files
-REC_SRC = src/recorder.c
-REC_OBJ = $(REC_SRC:.c=.o)
+# 3. Source Files
+SOURCES = src/main.c \
+          src/recorder.c \
+          src/recognizer.c \
+          src/downloader.c \
+          src/scraper_bridge.c \
+          src/midi_player.c
 
-RECOGNIZE_SRC = src/recognizer.c
-RECOGNIZE_OBJ = $(RECOGNIZE_SRC:.c=.o)
+OBJECTS = $(SOURCES:.c=.o)
 
-MIDI_SRC = src/midi_player.c
-MIDI_OBJ = $(MIDI_SRC:.c=.o)
-
-BRIDGE_SRC = src/scraper_bridge.c
-BRIDGE_OBJ = $(BRIDGE_SRC:.c=.o)
-
-# 4. Linker Flags (Libraries)
-LDFLAGS_REC = -lportaudio -lsndfile
-LDFLAGS_RECOGNIZE = -lcurl -lssl -lcrypto -ljansson
-LDFLAGS_MIDI = -lfluidsynth
+# 4. Linker Flags
+# -lportaudio -lsndfile (Recorder)
+# -lcurl -lssl -lcrypto -ljansson (Recognizer & Downloader)
+# -lfluidsynth (MIDI Player)
+LDFLAGS = -lportaudio -lsndfile -lcurl -lssl -lcrypto -ljansson -lfluidsynth
 
 # 5. Build Rules
-all: $(REC_APP) $(RECOGNIZE_APP) $(MIDI_APP)
+all: $(APP)
 
-# Rule to build the recorder
-$(REC_APP): $(REC_OBJ)
-	@echo "Linking Recorder..."
-	$(CC) $(REC_OBJ) -o $(REC_APP) $(LDFLAGS_REC)
-	@echo "Recorder build finished: $(REC_APP)"
+$(APP): $(OBJECTS)
+	@echo "🎹 Linking Piano Buddy..."
+	$(CC) $(OBJECTS) -o $(APP) $(LDFLAGS)
+	@echo "✅ Build successful! Run with: ./$(APP)"
 
-# Rule to build the recognizer
-$(RECOGNIZE_APP): $(RECOGNIZE_OBJ)
-	@echo "Linking Recognizer..."
-	$(CC) $(RECOGNIZE_OBJ) -o $(RECOGNIZE_APP) $(LDFLAGS_RECOGNIZE)
-	@echo "Recognizer build finished: $(RECOGNIZE_APP)"
-
-# Rule to build the MIDI player
-$(MIDI_APP): $(MIDI_OBJ)
-	@echo "Linking MIDI Player..."
-	$(CC) $(MIDI_OBJ) -o $(MIDI_APP) $(LDFLAGS_MIDI)
-	@echo "MIDI Player build finished: $(MIDI_APP)"
-
-#Rule to build scraper bridge
-$(BRIDGE_APP): $(BRIDGE_OBJ)
-	@echo "Linking Bridge..."
-	$(CC) $(BRIDGE_OBJ) -o $(BRIDGE_APP)
-	@echo "Bridge built."
-
-# Generic rule to compile any .c file in src/ into its .o file
+# Generic compile rule
 src/%.o: src/%.c
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Rule to clean up
 clean:
 	@echo "Cleaning up..."
-	rm -f src/*.o $(REC_APP) $(RECOGNIZE_APP) $(MIDI_APP)
+	rm -f src/*.o $(APP) recording.wav song.mid
