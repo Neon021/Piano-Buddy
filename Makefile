@@ -1,10 +1,9 @@
 CC = gcc
 CFLAGS = -Wall -Iinclude -g
 
-APP = bin/piano_buddy
+APP = bin/piano_buddy_gui
 
-# 3. Source Files
-SOURCES = src/main.c \
+SOURCES = src/gui_main.c \
           src/recorder.c \
           src/recognizer.c \
           src/downloader.c \
@@ -13,21 +12,16 @@ SOURCES = src/main.c \
 
 OBJECTS = $(SOURCES:.c=.o)
 
-# 4. Linker Flags
-# -lportaudio -lsndfile (Recorder)
-# -lcurl -lssl -lcrypto -ljansson (Recognizer & Downloader)
-# -lfluidsynth (MIDI Player)
-LDFLAGS = -lportaudio -lsndfile -lcurl -lssl -lcrypto -ljansson -lfluidsynth
+LDFLAGS = -lportaudio -lsndfile -lcurl -lssl -lcrypto -ljansson -lfluidsynth \
+          -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
-# 5. Build Rules
 all: $(APP)
 
 $(APP): $(OBJECTS)
-	@echo "🎹 Linking Piano Buddy..."
+	@echo "🎹 Linking Piano Buddy GUI..."
 	$(CC) $(OBJECTS) -o $(APP) $(LDFLAGS)
 	@echo "✅ Build successful! Run with: ./$(APP)"
 
-# Generic compile rule
 src/%.o: src/%.c
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@
