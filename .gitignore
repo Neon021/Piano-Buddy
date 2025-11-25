@@ -12,3 +12,6 @@ config.h
 
 # Any WAV files
 *.wav
+
+# HTML dumps for debugging
+*.html
