@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <fluidsynth.h>
+#include <stdbool.h>
 
-int play_midi_muted(const char *soundfont, const char *midi_file) {
+int play_midi_muted(const char *soundfont, const char *midi_file, volatile bool *should_stop) {
     int res = 0;
     
     fluid_settings_t* settings = new_fluid_settings();
@@ -56,9 +57,14 @@ int play_midi_muted(const char *soundfont, const char *midi_file) {
     printf("Playing... Press Enter to stop.\n");
     fluid_player_play(player);
     
-    getchar();
+    while (fluid_player_get_status(player) == FLUID_PLAYER_PLAYING) {
+        // Check if the GUI has requested a stop
+        if (should_stop != NULL && *should_stop) {
+            printf("⏹️ Stop requested by user.\n");
+            break; 
+        }
+    }
 
-    printf("Stopping playback.\n");
     fluid_player_stop(player);
     fluid_player_join(player); // Wait for playback to fully finish
 

@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 #ifndef PIANO_BUDDY_H
 #define PIANO_BUDDY_H
 
@@ -14,6 +16,6 @@ char* get_midi_url_from_python(const char *query);
 int download_file(const char *url, const char *output_filename);
 
 // midi_player.c
-int play_midi_muted(const char *soundfont, const char *midi_file);
+int play_midi_muted(const char *soundfont, const char *midi_file, volatile bool *should_stop);
 
 #endif
