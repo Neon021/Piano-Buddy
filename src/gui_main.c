@@ -145,7 +145,7 @@ int main() {
             
             EndDrawing(); // Force draw
 
-            if (record_audio(RECORDING_FILE, 15) != 0) {
+            if (record_audio(RECORDING_FILE, 1) != 0) {
                 currentState = STATE_ERROR;
                 strcpy(statusMessage, "Recording Failed.");
             } else {
@@ -185,7 +185,8 @@ int main() {
                 // Y Position: 40% down the screen (h * 0.4f)
                 Rectangle boxBounds = { center - (boxWidth / 2), h * 0.4f, boxWidth, boxHeight };
                 
-                GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(20 * scale));
+                int boxTextFontSize = (int)(14.0f * scale);
+                GuiSetStyle(DEFAULT, TEXT_SIZE, boxTextFontSize);
 
                 int result = GuiTextInputBox(boxBounds, 
                                              "Enter Song Name", 
@@ -253,9 +254,26 @@ int main() {
             DrawTextCentered(customFont, songTitle, center, h * 0.4f, titleSize, MAROON);
             // DrawTextCentered(customFont, "(Piano Track Muted)", center, h * 0.5f, 20, GRAY);
 
-            // float time = GetTime();
-            // DrawCircle(480, 390, 10 + (sin(time * 5) * 3), MAROON); 
-            // DrawTextCentered("Playing...", 420, 380, 10, DARKGRAY);
+// 1. Calculate Position (Bottom-Right Corner)
+            // We subtract from 'w' and 'h' to anchor to the bottom-right
+            float indicatorX = w - (50 * scale); 
+            float indicatorY = h - (60 * scale); // Kept above status bar
+            
+            // 2. Calculate Radius with Pulse
+            // Base radius 10, pulsing by 3. Multiplied by scale.
+            float time = GetTime();
+            float baseRadius = 10.0f * scale;
+            float pulse = (sin(time * 5.0f) * 3.0f) * scale;
+            float finalRadius = baseRadius + pulse;
+
+            // 3. Draw Circle
+            DrawCircle((int)indicatorX, (int)indicatorY, finalRadius, MAROON); 
+
+            // 4. Draw Text next to it
+            // "Playing..." text size scaled
+            float labelSize = 14.0f * scale;
+            // Position text to the left of the circle
+            DrawText("Playing...", indicatorX - (70 * scale), indicatorY - (labelSize/2), labelSize, DARKGRAY);
 
             // Stop Button
             if (GuiButton((Rectangle){center - 100, h * 0.7f, 200, 50}, GuiIconText(ICON_PLAYER_STOP, "Stop"))) {
