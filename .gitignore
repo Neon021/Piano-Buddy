@@ -1,3 +1,7 @@
+#python virtual environment
+piano_buddy_venv/
+__pycache__/
+
 # Executables and binaries in the bin folder
 /bin/
 
@@ -10,8 +14,11 @@ config.h
 # VS Code specific files
 .vscode/
 
-# Any WAV files
+# Any sound files
 *.wav
+*.mp3
+downloaded_song.*
+separated_output/
 
 # HTML dumps for debugging
 *.html
