@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "raylib.h"
 #include <pthread.h>
+#include <math.h>
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
@@ -46,13 +47,24 @@ void* audio_thread_func(void* arg) {
     return NULL;
 }
 
+//Helper function to scale text
+void DrawTextCentered(Font font, const char* text, float centerX, float y, float fontSize, Color color) {
+    Vector2 textSize = MeasureTextEx(font, text, fontSize, 1.0f);
+    // If we want the center to be at 'centerX', we start drawing at 'centerX - halfWidth'
+    float textStartX = centerX - (textSize.x / 2.0f);
+
+    DrawTextEx(font, text, (Vector2){ textStartX, y }, fontSize, 1.0f, color);
+}
+
 int main() {
     // --- INITIALIZATION ---
-    const int screenWidth = 500;
-    const int screenHeight = 400;
-
-    InitWindow(screenWidth, screenHeight, "Piano Buddy v1.0");
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(800, 600, "Piano Buddy v1.0");
     SetTargetFPS(60);
+
+    Font customFont = LoadFontEx("resources/Roboto-Bold.ttf", 96, 0, 0);
+    SetTextureFilter(customFont.texture, TEXTURE_FILTER_BILINEAR);
+    GuiSetFont(customFont);
 
     // App Variables
     AppState currentState = STATE_IDLE;
@@ -78,32 +90,60 @@ int main() {
 
     // APP LOOP
     while (!WindowShouldClose()) {
+        int w = GetScreenWidth();
+        int h = GetScreenHeight();
         
+        float center = w * 0.5f;
+
+        float scale = w / 800.0f; 
+        if (scale < 0.5f) 
+            scale = 0.5f;
         // UPDATE LOGIC & DRAWING
         BeginDrawing();
         ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
 
+        // Draw a faint sine wave in the background if Recording or Playing
+        if (currentState == STATE_RECORDING || currentState == STATE_PLAYING) {
+            for (int i = 0; i < w; i+=5) {
+                float time = GetTime();
+                float amplitude = (currentState == STATE_RECORDING) ? 50 : 30;
+                float frequency = (currentState == STATE_RECORDING) ? 0.05f : 0.02f;
+                // Simple sine wave math
+                DrawPixel(i, (h/2) + sin(i * frequency + time * 10) * amplitude, LIGHTGRAY);
+                DrawPixel(i, (h/2) + sin(i * frequency + time * 10 + 100) * amplitude, Fade(MAROON, 0.3f));
+            }
+        }
+
         // Draw Title
-        DrawText("Piano Buddy", 150, 20, 40, DARKGRAY);
-        DrawLine(20, 70, 480, 70, GRAY);
+        float titleSize = 70.0f * scale; 
+        DrawTextCentered(customFont, "Piano Buddy", center, h * 0.1f, titleSize, DARKGRAY);
+        DrawLine(w * 0.1f, h * 0.15f, w * 0.9f, h * 0.15f, GRAY);
 
         // Draw Status Message
-        GuiStatusBar((Rectangle){0, screenHeight - 30, screenWidth, 30}, statusMessage);
+        GuiStatusBar((Rectangle){0, h - (30 * scale), w, (30 * scale)}, statusMessage);
 
 
         // STATE MACHINE UI
         if (currentState == STATE_IDLE) {
-            if (GuiButton((Rectangle){150, 150, 200, 50}, GuiIconText(ICON_PLAYER_RECORD, "Record (15s)"))) {
+            float btnW = 200 * scale;
+            float btnH = 50 * scale;
+            if (GuiButton((Rectangle){center - btnW/2, h * 0.4f, btnW, btnH}, 
+                          GuiIconText(ICON_PLAYER_RECORD, "Record (15s)"))) {
                 currentState = STATE_RECORDING;
                 strcpy(statusMessage, "Recording audio...");
             }
-            DrawText("Press the button to listen.", 140, 220, 20, GRAY);
+            float subSize = 20.0f * scale;
+            DrawTextCentered(customFont, "Press to listen", center, h * 0.55f, subSize, GRAY);
         }
         else if (currentState == STATE_RECORDING) {
-            DrawText("Listening...", 190, 150, 30, RED);
+            float subSize = 35.0f * scale;
+            DrawTextCentered(customFont, "Listening...", center, h * 0.4f, subSize, MAROON);
             
-            // FORCE DRAW to screen before blocking
-            EndDrawing(); 
+            // Draw a pulsing circle
+            float pulse = sin(GetTime() * 10) * 10;
+            DrawCircleLines(center, h * 0.6f, 40 + pulse, RED);
+            
+            EndDrawing(); // Force draw
 
             if (record_audio(RECORDING_FILE, 15) != 0) {
                 currentState = STATE_ERROR;
@@ -135,10 +175,22 @@ int main() {
             continue;
         }
         else if (currentState == STATE_MANUAL_INPUT) {
-            DrawText("Could not identify song.", 140, 120, 20, MAROON);
+            // 1. Draw Error Message
+            // Move it down to 30% of screen height (h * 0.3f) so it clears the title
+            float errorMsgSize = 30.0f * scale;
+            DrawTextCentered(customFont, "Could not identify song.", center, h * 0.3f, errorMsgSize, MAROON);
             
             if (showInputBox) {
-                int result = GuiTextInputBox((Rectangle){100, 160, 300, 120}, 
+                float boxWidth = 300 * scale;
+                float boxHeight = 140 * scale;
+                
+                // Centered X: center - half_width
+                // Y Position: 40% down the screen (h * 0.4f)
+                Rectangle boxBounds = { center - (boxWidth / 2), h * 0.4f, boxWidth, boxHeight };
+                
+                GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(20 * scale));
+
+                int result = GuiTextInputBox(boxBounds, 
                                              "Enter Song Name", 
                                              "Type the song name to search:", 
                                              "Search", 
@@ -185,11 +237,12 @@ int main() {
                 // CONFIGURE PLAYBACK THREAD VARS
                 printf("DEBUG: Configuring playback thread");
                 strcpy(audioData.soundfont, SOUNDFONT_FILE);
-                strcpy(audioData.midi_file, DOWNLOADED_MIDI);
-                audioData.stop_flag = false;
+                strcpy(audioData.midi_file, DOWNLOADED_MIDI);                
                 
-                // CREATE PLAYBACK THREAD
-                printf("DEBUG: Creating playback thread");
+                // RUN PLAYBACK THREAD
+                audioData.stop_flag = false;
+                audioData.is_running = true; //set this to true before creating the thread to avoid race condition
+                printf("DEBUG: Running playback thread");
                 if (pthread_create(&playbackThread, NULL, audio_thread_func, &audioData) != 0) {
                      currentState = STATE_ERROR;
                      strcpy(statusMessage, "Failed to create audio thread.");
@@ -199,19 +252,23 @@ int main() {
             continue;
         }
         else if (currentState == STATE_PLAYING) {
-            DrawText("Now Playing:", 50, 120, 20, DARKGRAY);
-            DrawText(songTitle, 50, 150, 30, MAROON);
-            // DrawText("(Piano Track Muted)", 150, 200, 20, GRAY);
-            
-            float time = GetTime();
-            DrawCircle(480, 390, 10 + (sin(time * 5) * 3), MAROON); 
-            DrawText("Playing...", 420, 380, 10, DARKGRAY);
+            float subSize = 35.0f * scale;
+            float titleSize = 40.0f * scale;
+            DrawTextCentered(customFont, "Now Playing:", center, h * 0.3f, subSize, DARKGRAY);
+            DrawTextCentered(customFont, songTitle, center, h * 0.4f, titleSize, MAROON);
+            // DrawTextCentered(customFont, "(Piano Track Muted)", center, h * 0.5f, 20, GRAY);
 
-            if (GuiButton((Rectangle){150, 300, 200, 50}, GuiIconText(ICON_PLAYER_STOP, "Stop Playback"))) {
+            // float time = GetTime();
+            // DrawCircle(480, 390, 10 + (sin(time * 5) * 3), MAROON); 
+            // DrawText("Playing...", 420, 380, 10, DARKGRAY);
+
+            // Stop Button
+            if (GuiButton((Rectangle){center - 100, h * 0.7f, 200, 50}, GuiIconText(ICON_PLAYER_STOP, "Stop"))) {
                 audioData.stop_flag = true; // Tell thread to stop
                 currentState = STATE_IDLE;
                 strcpy(statusMessage, "Stopping...");
             }
+            
             
             // Cleanup thread if not already
             if (!audioData.is_running) {
@@ -237,6 +294,7 @@ int main() {
         audioData.stop_flag = true;
         pthread_join(playbackThread, NULL);
     }
+    UnloadFont(customFont);
     CloseWindow();
 
     return 0;
