@@ -98,6 +98,7 @@ int main() {
         float scale = w / 800.0f; 
         if (scale < 0.5f) 
             scale = 0.5f;
+        GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(20 * scale));
         // UPDATE LOGIC & DRAWING
         BeginDrawing();
         ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
@@ -115,14 +116,14 @@ int main() {
         }
 
         // Draw Title
-        float titleSize = 70.0f * scale; 
-        DrawTextCentered(customFont, "Piano Buddy", center, h * 0.1f, titleSize, DARKGRAY);
-        DrawLine(w * 0.1f, h * 0.15f, w * 0.9f, h * 0.15f, GRAY);
+        DrawTextCentered(customFont, "Piano Buddy", center, h * 0.1f, 70.0f * scale, DARKGRAY);
+        DrawLine(w * 0.1f, h * 0.30f, w * 0.9f, h * 0.30f, GRAY);
 
         // Draw Status Message
         GuiStatusBar((Rectangle){0, h - (30 * scale), w, (30 * scale)}, statusMessage);
 
-
+        float subSize = 35.0f * scale;
+        float titleSize = 40.0f * scale;
         // STATE MACHINE UI
         if (currentState == STATE_IDLE) {
             float btnW = 200 * scale;
@@ -136,7 +137,6 @@ int main() {
             DrawTextCentered(customFont, "Press to listen", center, h * 0.55f, subSize, GRAY);
         }
         else if (currentState == STATE_RECORDING) {
-            float subSize = 35.0f * scale;
             DrawTextCentered(customFont, "Listening...", center, h * 0.4f, subSize, MAROON);
             
             // Draw a pulsing circle
@@ -156,7 +156,7 @@ int main() {
             continue; // Skip the standard EndDrawing since we forced it
         }
         else if (currentState == STATE_IDENTIFYING) {
-            DrawText("Identifying...", 180, 150, 30, BLUE);
+            DrawTextCentered(customFont, "Identifying...",  center, h * 0.3f, titleSize, BLUE);
             EndDrawing();
 
             found_title = identify_song(RECORDING_FILE);
@@ -175,10 +175,7 @@ int main() {
             continue;
         }
         else if (currentState == STATE_MANUAL_INPUT) {
-            // 1. Draw Error Message
-            // Move it down to 30% of screen height (h * 0.3f) so it clears the title
-            float errorMsgSize = 30.0f * scale;
-            DrawTextCentered(customFont, "Could not identify song.", center, h * 0.3f, errorMsgSize, MAROON);
+            DrawTextCentered(customFont, "Could not identify song.", center, h * 0.3f, titleSize, MAROON);
             
             if (showInputBox) {
                 float boxWidth = 300 * scale;
@@ -207,7 +204,7 @@ int main() {
             }
         }
         else if (currentState == STATE_SEARCHING) {
-            DrawText("Searching Web...", 160, 150, 30, ORANGE);
+            DrawTextCentered(customFont, "Searching Web...", center, h * 0.3f, titleSize, ORANGE);
             EndDrawing();
 
             found_url = get_midi_url_from_python(songTitle);
@@ -222,7 +219,7 @@ int main() {
             continue;
         }
         else if (currentState == STATE_DOWNLOADING) {
-            DrawText("Downloading...", 160, 150, 30, ORANGE);
+            DrawTextCentered(customFont, "Downloading...",  center, h * 0.3f, titleSize, ORANGE);
             EndDrawing();
 
             printf("DEBUG: Downloading Midi file");
@@ -252,15 +249,13 @@ int main() {
             continue;
         }
         else if (currentState == STATE_PLAYING) {
-            float subSize = 35.0f * scale;
-            float titleSize = 40.0f * scale;
             DrawTextCentered(customFont, "Now Playing:", center, h * 0.3f, subSize, DARKGRAY);
             DrawTextCentered(customFont, songTitle, center, h * 0.4f, titleSize, MAROON);
             // DrawTextCentered(customFont, "(Piano Track Muted)", center, h * 0.5f, 20, GRAY);
 
             // float time = GetTime();
             // DrawCircle(480, 390, 10 + (sin(time * 5) * 3), MAROON); 
-            // DrawText("Playing...", 420, 380, 10, DARKGRAY);
+            // DrawTextCentered("Playing...", 420, 380, 10, DARKGRAY);
 
             // Stop Button
             if (GuiButton((Rectangle){center - 100, h * 0.7f, 200, 50}, GuiIconText(ICON_PLAYER_STOP, "Stop"))) {
@@ -278,8 +273,8 @@ int main() {
             }
         }
         else if (currentState == STATE_ERROR) {
-            DrawText("Error Occurred", 160, 120, 30, RED);
-            DrawText(statusMessage, 50, 180, 20, BLACK);
+            DrawTextCentered(customFont, "Error Occurred", center, h * 0.3f, subSize, RED);
+            DrawTextCentered(customFont, statusMessage, center, h * 0.4f, titleSize, BLACK);
             
             if (GuiButton((Rectangle){150, 250, 200, 40}, "Try Again")) {
                 currentState = STATE_IDLE;
