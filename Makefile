@@ -6,7 +6,8 @@ APP = bin/piano_buddy_gui
 SOURCES = src/gui_main.c \
           src/recorder.c \
           src/recognizer.c \
-          src/processor_bridge.c
+          src/processor_bridge.c \
+		  src/library_manager.c
 
 OBJECTS = $(SOURCES:.c=.o)
 

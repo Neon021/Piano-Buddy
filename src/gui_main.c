@@ -30,6 +30,10 @@ typedef struct {
 
 //Global instance for v1
 ProcessorThreadData procData;
+char** librarySongs = NULL;
+int libraryCount = 0;
+int selectedSongIndex = -1;
+int scrollIndex = 0;
 
 // The function that runs in the background thread
 void* proc_thread_func(void* arg) {
@@ -42,6 +46,11 @@ void* proc_thread_func(void* arg) {
     data->is_done = true;
     data->success = result == 0;
     return NULL;
+}
+void RefreshLibrary() {
+    if (librarySongs) 
+        free_song_list(librarySongs, libraryCount);
+    librarySongs = get_library_songs(&libraryCount);
 }
 
 //Helper function to scale text
@@ -58,6 +67,7 @@ int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Piano Buddy v1.0");
     SetTargetFPS(60);
+    RefreshLibrary();
 
     InitAudioDevice();
 
@@ -110,14 +120,49 @@ int main() {
         // STATE MACHINE UI
         if (currentState == STATE_IDLE) {
             float btnW = 200 * scale;
-            float btnH = 50 * scale;
-            if (GuiButton((Rectangle){center - btnW/2, h * 0.4f, btnW, btnH}, 
-                          GuiIconText(ICON_PLAYER_RECORD, "Record (15s)"))) {
+            float btnH = 60 * scale;
+            if (GuiButton((Rectangle){(w * 0.25f) - btnW/2, h * 0.4f, btnW, btnH}, 
+                          GuiIconText(ICON_PLAYER_RECORD, "Record New"))) {
                 currentState = STATE_RECORDING;
                 strcpy(statusMessage, "Recording audio...");
             }
-            float subSize = 20.0f * scale;
-            DrawTextCentered(customFont, "Press to listen", center, h * 0.55f, subSize, GRAY);
+
+            //Library List
+            float listX = w * 0.6f;
+            float listY = h * 0.2f;
+            float listW = w * 0.35f;
+            float listH = h * 0.6f;
+
+            DrawText("Your Library:", listX, listY - 30*scale, 20*scale, DARKGRAY);
+            DrawRectangleLines(listX, listY, listW, listH, LIGHTGRAY);
+
+            // Draw List Items
+            float itemHeight = 40 * scale;
+            GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(16 * scale));
+            
+            for (int i = 0; i < libraryCount; i++) {
+                Rectangle itemRect = { listX + 5, listY + 5 + (i * itemHeight), listW - 10, itemHeight - 5 };
+                
+                // If clicked, load this song directly
+                if (GuiButton(itemRect, librarySongs[i])) {
+                    snprintf(songTitle, sizeof(songTitle), "%s", librarySongs[i]);
+                    
+                    char path[512];
+                    snprintf(path, sizeof(path), "library/%s/backing_track.mp3", librarySongs[i]);
+                    
+                    if (access(path, F_OK) == 0) {
+                        currentState = STATE_PLAYING;
+                        strcpy(statusMessage, "Loaded from Library.");
+                        if (music_loaded) 
+                            UnloadMusicStream(curr_music);
+                        curr_music = LoadMusicStream(path);
+                        PlayMusicStream(curr_music);
+                        music_loaded = true;
+                    } else {
+                        strcpy(statusMessage, "Error: File missing!");
+                    }
+                }
+            }
         }
         else if (currentState == STATE_RECORDING) {
             DrawTextCentered(customFont, "Listening...", center, h * 0.4f, subSize, MAROON);
@@ -194,7 +239,9 @@ int main() {
                     currentState = STATE_PLAYING;
                     strcpy(statusMessage, "Playing Backing Track!");
                      
-                    if (music_loaded) UnloadMusicStream(curr_music);
+                    RefreshLibrary();
+                    if (music_loaded) 
+                        UnloadMusicStream(curr_music);
                     curr_music = LoadMusicStream("backing_track.mp3");
                     PlayMusicStream(curr_music);
                     music_loaded = true;
