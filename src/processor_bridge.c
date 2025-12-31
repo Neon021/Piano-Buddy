@@ -3,15 +3,20 @@
 #include <string.h>
 #include "piano_buddy.h"
 
-// Calls the Python script to Download -> Separate -> Mix
-// Returns 0 on success, 1 on failure
-int process_song_with_python(const char* song_name) {
+int processingProgress = 0;
+
+// Returns 0 on success, 1 on failure.
+// Writes the resulting folder name into 'output_folder_buffer'
+int process_song_with_python(const char* song_name, char* output_folder_buffer) {
     char command[512];
     char buffer[1024];
     int success = 0;
+    
+    processingProgress = 0;
 
     printf("DEBUG: C requesting processing for: [%s]\n", song_name);
 
+    // Use the venv python
     snprintf(command, sizeof(command), 
              "./piano_buddy_venv/bin/python3 src/processor.py \"%s\" 2>&1", 
              song_name);
@@ -22,23 +27,26 @@ int process_song_with_python(const char* song_name) {
         return 1;
     }
 
-    // Read output line by line to check for success
     while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        // Remove newline
-        buffer[strcspn(buffer, "\n")] = 0;
-        printf("PYTHON: %s\n", buffer); // Forward Python logs to C terminal
+        buffer[strcspn(buffer, "\n")] = 0; // Trim newline
+        printf("PYTHON: %s\n", buffer);
 
-        // Check for our specific success signal
-        if (strstr(buffer, "OUTPUT:backing_track.mp3") != NULL) {
+        if (strncmp(buffer, "PROGRESS:", 9) == 0) {
+            processingProgress = atoi(buffer + 9);
+        }
+        else if (strncmp(buffer, "OUTPUT:", 7) == 0) {
+            if (output_folder_buffer) {
+                strcpy(output_folder_buffer, buffer + 7);
+            }
             success = 1;
         }
     }
 
     int status = pclose(fp);
     
-    if (success && status == 0) {
-        return 0; // Success
+    if (success || status == 0) {
+        return 0; 
     } else {
-        return 1; // Failed
+        return 1;
     }
 }

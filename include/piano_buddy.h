@@ -10,7 +10,8 @@ int record_audio(const char *filename, int seconds);
 char* identify_song(const char *filename);
 
 // processor_bridge
-int process_song_with_python(const char* song_name);
+extern int processingProgress; // Share this variable
+int process_song_with_python(const char* song_name, char* output_folder_buffer);
 
 // library_manager
 char** get_library_songs(int* count);
