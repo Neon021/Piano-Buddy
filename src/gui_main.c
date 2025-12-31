@@ -35,10 +35,21 @@ int libraryCount = 0;
 int selectedSongIndex = -1;
 int scrollIndex = 0;
 
-bool stemVocals = true;
-bool stemDrums = true;
-bool stemBass = true;
-bool stemOther = true;
+typedef struct {
+    Music vocals;
+    Music drums;
+    Music bass;
+    Music other;
+    
+    float volVocals;
+    float volDrums;
+    float volBass;
+    float volOther;
+    
+    bool isLoaded;
+} StemMixer;
+
+StemMixer globalMixer = {0};
 // The function that runs in the background thread
 void* proc_thread_func(void* arg) {
     printf("DEBUG: proc_thread_func function start");
@@ -66,6 +77,77 @@ void DrawTextCentered(Font font, const char* text, float centerX, float y, float
     DrawTextEx(font, text, (Vector2){ textStartX, y }, fontSize, 1.0f, color);
 }
 
+int LoadStemMixer(const char* songFolder) {
+    if (globalMixer.isLoaded) {
+        UnloadMusicStream(globalMixer.vocals);
+        UnloadMusicStream(globalMixer.drums);
+        UnloadMusicStream(globalMixer.bass);
+        UnloadMusicStream(globalMixer.other);
+    }
+
+    char path[512];
+    
+    // Note: In a real app, we might need a "silence.wav" fallback, 
+    snprintf(path, sizeof(path), "library/%s/vocals.wav", songFolder);
+    globalMixer.vocals = LoadMusicStream(path);
+    
+    snprintf(path, sizeof(path), "library/%s/drums.wav", songFolder);
+    globalMixer.drums = LoadMusicStream(path);
+    
+    snprintf(path, sizeof(path), "library/%s/bass.wav", songFolder);
+    globalMixer.bass = LoadMusicStream(path);
+    
+    snprintf(path, sizeof(path), "library/%s/other.wav", songFolder);
+    globalMixer.other = LoadMusicStream(path);
+
+    // Default Volumes
+    globalMixer.volVocals = 1.0f;
+    globalMixer.volDrums = 1.0f;
+    globalMixer.volBass = 1.0f;
+    globalMixer.volOther = 1.0f;
+
+    // Start all
+    PlayMusicStream(globalMixer.vocals);
+    PlayMusicStream(globalMixer.drums);
+    PlayMusicStream(globalMixer.bass);
+    PlayMusicStream(globalMixer.other);
+
+    globalMixer.isLoaded = true;
+
+    return 1;
+}
+
+void UpdateStemMixer() {
+    if (!globalMixer.isLoaded) return;
+    
+    UpdateMusicStream(globalMixer.vocals);
+    UpdateMusicStream(globalMixer.drums);
+    UpdateMusicStream(globalMixer.bass);
+    UpdateMusicStream(globalMixer.other);
+    
+    SetMusicVolume(globalMixer.vocals, globalMixer.volVocals);
+    SetMusicVolume(globalMixer.drums, globalMixer.volDrums);
+    SetMusicVolume(globalMixer.bass, globalMixer.volBass);
+    SetMusicVolume(globalMixer.other, globalMixer.volOther);
+}
+
+void UnloadStemMixer(){
+    if (!globalMixer.isLoaded) return;
+
+    UnloadMusicStream(globalMixer.vocals);
+    UnloadMusicStream(globalMixer.drums);
+    UnloadMusicStream(globalMixer.bass);
+    UnloadMusicStream(globalMixer.other);
+}
+
+void StopStemMixer() {
+    if (!globalMixer.isLoaded) return;
+    StopMusicStream(globalMixer.vocals);
+    StopMusicStream(globalMixer.drums);
+    StopMusicStream(globalMixer.bass);
+    StopMusicStream(globalMixer.other);
+}
+
 int main() {
     // --- INITIALIZATION ---
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
@@ -87,10 +169,6 @@ int main() {
     char manualInputBuffer[256] = {0};
     bool showInputBox = false;
 
-    Music curr_music = {0};
-    bool music_loaded = false;
-    float volume = 1.0f;
-
     pthread_t playback_thread;
     // APP LOOP
     while (!WindowShouldClose()) {
@@ -103,9 +181,8 @@ int main() {
             scale = 0.5f;
         GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(20 * scale));
 
-        if(currentState == STATE_PLAYING && music_loaded){
-            UpdateMusicStream(curr_music);
-            SetMusicVolume(curr_music, volume);
+        if (currentState == STATE_PLAYING && globalMixer.isLoaded){
+            UpdateStemMixer();
         }
 
         // UPDATE LOGIC & DRAWING
@@ -159,15 +236,9 @@ int main() {
                     EndDrawing();
 
                     // 1. Generate the Mix on the fly
-                    if (create_temp_mix(songTitle, stemVocals, stemDrums, stemBass, stemOther) == 0) {
+                    if (LoadStemMixer(songTitle)) {
                         currentState = STATE_PLAYING;
                         strcpy(statusMessage, "Playing custom mix.");
-                        
-                        if (music_loaded) UnloadMusicStream(curr_music);
-                        // Always load the generic session file
-                        curr_music = LoadMusicStream("current_session_mix.mp3"); 
-                        PlayMusicStream(curr_music);
-                        music_loaded = true;
                     } else {
                         strcpy(statusMessage, "Error: Could not mix stems.");
                     }
@@ -246,21 +317,13 @@ int main() {
                 if (procData.is_done) {
                     pthread_join(playback_thread, NULL);
                     if (procData.success) {
-                        // 1. Generate Mix immediately
-                        create_temp_mix(songTitle, stemVocals, stemDrums, stemBass, stemOther);
-                     
+                        LoadStemMixer(songTitle);                     
+                        
                         currentState = STATE_PLAYING;
                         strcpy(statusMessage, "Playing Backing Track!");
                      
                         RefreshLibrary();
-                     
-                        if (music_loaded) 
-                            UnloadMusicStream(curr_music);
-                        curr_music = LoadMusicStream("current_session_mix.mp3");
-                        PlayMusicStream(curr_music);
-                        music_loaded = true;
                  }
-                 // ...
             }
         }
         else if (currentState == STATE_PLAYING) {
@@ -271,34 +334,32 @@ int main() {
             DrawCircle((int)(w - 50*scale), (int)(h - 60*scale), (10 + sin(time*5)*3)*scale, MAROON);
 
             // STEM TOGGLES
-            float toggleY = h * 0.5f;
-            float toggleX = center - (150 * scale);
-            float gap = 80 * scale;
-
-            // Re-Mix Button logic:
-            // Only re-mix if user clicks a specialized "Remix" button, 
-            // otherwise the audio will stutter if we try to do it on every click.
-            GuiCheckBox((Rectangle){toggleX, toggleY, 20*scale, 20*scale}, "Vocals", &stemVocals);
-            GuiCheckBox((Rectangle){toggleX + gap, toggleY, 20*scale, 20*scale}, "Drums", &stemDrums);
-            GuiCheckBox((Rectangle){toggleX + gap*2, toggleY, 20*scale, 20*scale}, "Bass", &stemBass);
-            GuiCheckBox((Rectangle){toggleX + gap*3, toggleY, 20*scale, 20*scale}, "Other", &stemOther);
+            float sliderX = center - (180 * scale);
+            float startY = h * 0.5f;
+            float gap = 30 * scale;
             
-            if (GuiButton((Rectangle){center - 50*scale, toggleY + 40*scale, 100*scale, 30*scale}, "Remix")) {
-                 StopMusicStream(curr_music);
-                 UnloadMusicStream(curr_music); // Release file lock
-                 
-                 create_temp_mix(songTitle, stemVocals, stemDrums, stemBass, stemOther);
-                 
-                 curr_music = LoadMusicStream("current_session_mix.mp3");
-                 PlayMusicStream(curr_music);
-            }
+            GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(16 * scale));
 
-            GuiSlider((Rectangle){center - 100*scale, h * 0.6f, 200*scale, 20*scale}, 
-                      "Volume", NULL, &volume, 0.0f, 1.0f);
+            GuiSlider((Rectangle){sliderX, startY, 200*scale, 20*scale}, 
+                      "Vocals", TextFormat("%d%%", (int)(globalMixer.volVocals*100)), 
+                      &globalMixer.volVocals, 0.0f, 1.0f);
+                      
+            GuiSlider((Rectangle){sliderX, startY + gap, 200*scale, 20*scale}, 
+                      "Drums", TextFormat("%d%%", (int)(globalMixer.volDrums*100)), 
+                      &globalMixer.volDrums, 0.0f, 1.0f);
+                      
+            GuiSlider((Rectangle){sliderX, startY + gap*2, 200*scale, 20*scale}, 
+                      "Bass", TextFormat("%d%%", (int)(globalMixer.volBass*100)), 
+                      &globalMixer.volBass, 0.0f, 1.0f);
+
+            // "Other" usually contains the Piano, so we label it "Piano/Other"
+            GuiSlider((Rectangle){sliderX, startY + gap*3, 200*scale, 20*scale}, 
+                      "Piano/Other", TextFormat("%d%%", (int)(globalMixer.volOther*100)), 
+                      &globalMixer.volOther, 0.0f, 1.0f);
 
             if (GuiButton((Rectangle){center - 100*scale, h * 0.7f, 200*scale, 50*scale}, 
                           GuiIconText(ICON_PLAYER_STOP, "Stop"))) {
-                StopMusicStream(curr_music);
+                StopStemMixer();
                 currentState = STATE_IDLE;
             }
         }
@@ -315,8 +376,8 @@ int main() {
         EndDrawing();
     }
 
-    if (music_loaded) 
-        UnloadMusicStream(curr_music);
+    if (globalMixer.isLoaded) 
+        UnloadStemMixer();
 
     UnloadFont(customFont);
     CloseAudioDevice();
