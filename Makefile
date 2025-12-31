@@ -6,13 +6,11 @@ APP = bin/piano_buddy_gui
 SOURCES = src/gui_main.c \
           src/recorder.c \
           src/recognizer.c \
-          src/downloader.c \
-          src/scraper_bridge.c \
-          src/midi_player.c
+          src/processor_bridge.c
 
 OBJECTS = $(SOURCES:.c=.o)
 
-LDFLAGS = -lportaudio -lsndfile -lcurl -lssl -lcrypto -ljansson -lfluidsynth \
+LDFLAGS = -lportaudio -lsndfile -lcurl -lssl -lcrypto -ljansson \
           -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
 all: $(APP)
@@ -28,4 +26,4 @@ src/%.o: src/%.c
 
 clean:
 	@echo "Cleaning up..."
-	rm -f src/*.o $(APP) recording.wav song.mid
+	rm -rf src/*.o $(APP) debug_scraper_dump.html recording.wav downloaded_song.mp3 backing_track.mp3 separated_output/

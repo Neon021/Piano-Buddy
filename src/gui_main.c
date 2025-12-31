@@ -16,34 +16,31 @@ typedef enum {
     STATE_RECORDING,
     STATE_IDENTIFYING,
     STATE_MANUAL_INPUT,
-    STATE_SEARCHING,
-    STATE_DOWNLOADING,
+    STATE_PROCESSING,
     STATE_PLAYING,
     STATE_ERROR
 } AppState;
 
 // THREADING DATA
 typedef struct {
-    char soundfont[256];
-    char midi_file[256];
-    volatile bool stop_flag;
-    bool is_running;
-} AudioThreadData;
+    char songname[256];
+    bool success;
+    bool is_done;
+} ProcessorThreadData;
 
 //Global instance for v1
-AudioThreadData audioData;
+ProcessorThreadData procData;
 
 // The function that runs in the background thread
-void* audio_thread_func(void* arg) {
-    printf("DEBUG: audio_thread_func function start");
-    AudioThreadData* data = (AudioThreadData*)arg;
-    data->is_running = true;
+void* proc_thread_func(void* arg) {
+    printf("DEBUG: proc_thread_func function start");
+    ProcessorThreadData* data = (ProcessorThreadData*)arg;
     
-    printf("DEBUG: audio_thread_func play_midi_muted function started");
-    play_midi_muted(data->soundfont, data->midi_file, &data->stop_flag);
+    int result = process_song_with_python(data->songname);
     
-    printf("DEBUG: audio_thread_func function ended");
-    data->is_running = false;
+    printf("DEBUG: proc_thread_func function ended");
+    data->is_done = true;
+    data->success = result == 0;
     return NULL;
 }
 
@@ -58,9 +55,11 @@ void DrawTextCentered(Font font, const char* text, float centerX, float y, float
 
 int main() {
     // --- INITIALIZATION ---
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Piano Buddy v1.0");
     SetTargetFPS(60);
+
+    InitAudioDevice();
 
     Font customFont = LoadFontEx("resources/Roboto-Bold.ttf", 96, 0, 0);
     SetTextureFilter(customFont.texture, TEXTURE_FILTER_BILINEAR);
@@ -74,46 +73,30 @@ int main() {
     char manualInputBuffer[256] = {0};
     bool showInputBox = false;
 
-    const char* RECORDING_FILE = "recording.wav";
-    const char* SOUNDFONT_FILE = "FluidR3Mono_GM.sf3";
-    const char* DOWNLOADED_MIDI = "song.mid";
+    Music curr_music = {0};
+    bool music_loaded = false;
+    float volume = 1.0f;
 
-    char* found_title = NULL;
-    char* found_url = NULL;
-    pthread_t playbackThread;
-
-    // Check for SoundFont
-    if (access(SOUNDFONT_FILE, F_OK) != 0) {
-        currentState = STATE_ERROR;
-        strcpy(statusMessage, "Error: SoundFont file not found!");
-    }
-
+    pthread_t playback_thread;
     // APP LOOP
     while (!WindowShouldClose()) {
         int w = GetScreenWidth();
         int h = GetScreenHeight();
-        
         float center = w * 0.5f;
 
         float scale = w / 800.0f; 
         if (scale < 0.5f) 
             scale = 0.5f;
         GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(20 * scale));
+
+        if(currentState == STATE_PLAYING && music_loaded){
+            UpdateMusicStream(curr_music);
+            SetMusicVolume(curr_music, volume);
+        }
+
         // UPDATE LOGIC & DRAWING
         BeginDrawing();
         ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
-
-        // Draw a faint sine wave in the background if Recording or Playing
-        if (currentState == STATE_RECORDING || currentState == STATE_PLAYING) {
-            for (int i = 0; i < w; i+=5) {
-                float time = GetTime();
-                float amplitude = (currentState == STATE_RECORDING) ? 50 : 30;
-                float frequency = (currentState == STATE_RECORDING) ? 0.05f : 0.02f;
-                // Simple sine wave math
-                DrawPixel(i, (h/2) + sin(i * frequency + time * 10) * amplitude, LIGHTGRAY);
-                DrawPixel(i, (h/2) + sin(i * frequency + time * 10 + 100) * amplitude, Fade(MAROON, 0.3f));
-            }
-        }
 
         // Draw Title
         DrawTextCentered(customFont, "Piano Buddy", center, h * 0.1f, 70.0f * scale, DARKGRAY);
@@ -145,7 +128,7 @@ int main() {
             
             EndDrawing(); // Force draw
 
-            if (record_audio(RECORDING_FILE, 1) != 0) {
+            if (record_audio("recording.wav", 15) != 0) {
                 currentState = STATE_ERROR;
                 strcpy(statusMessage, "Recording Failed.");
             } else {
@@ -159,135 +142,82 @@ int main() {
             DrawTextCentered(customFont, "Identifying...",  center, h * 0.3f, titleSize, BLUE);
             EndDrawing();
 
-            found_title = identify_song(RECORDING_FILE);
-            if (found_title == NULL) {
+            char* result = identify_song("recording.wav");
+            if (result == NULL) {
                 // FALLBACK
                 currentState = STATE_MANUAL_INPUT;
                 strcpy(statusMessage, "Identification failed. Enter name manually.");
                 showInputBox = true;
                 memset(manualInputBuffer, 0, 256);
             } else {
-                snprintf(songTitle, sizeof(songTitle), "%s", found_title);
-                free(found_title);
-                currentState = STATE_SEARCHING;
-                strcpy(statusMessage, "Searching for MIDI...");
+                snprintf(songTitle, sizeof(songTitle), "%s", result);
+                free(result);
+                currentState = STATE_PROCESSING;
+                strcpy(statusMessage, "AI Processing (This takes 1-2 mins)...");
+
+                strcpy(procData.songname, songTitle);
+                procData.is_done = false;
+                pthread_create(&playback_thread, NULL, proc_thread_func, &procData);
             }
             continue;
         }
         else if (currentState == STATE_MANUAL_INPUT) {
             DrawTextCentered(customFont, "Could not identify song.", center, h * 0.3f, titleSize, MAROON);
             
-            if (showInputBox) {
-                float boxWidth = 300 * scale;
-                float boxHeight = 140 * scale;
-                
-                // Centered X: center - half_width
-                // Y Position: 40% down the screen (h * 0.4f)
-                Rectangle boxBounds = { center - (boxWidth / 2), h * 0.4f, boxWidth, boxHeight };
-                
-                int boxTextFontSize = (int)(14.0f * scale);
-                GuiSetStyle(DEFAULT, TEXT_SIZE, boxTextFontSize);
+            float boxWidth = 300 * scale;
+             Rectangle boxBounds = { center - (boxWidth / 2), h * 0.4f, boxWidth, 160 * scale };
+             GuiSetStyle(DEFAULT, TEXT_SIZE, (int)(14 * scale));
+             if (showInputBox) {
+                 if (GuiTextInputBox(boxBounds, "Enter Song", "Title:", "Go", manualInputBuffer, 256, NULL) == 1) {
+                     snprintf(songTitle, sizeof(songTitle), "%s", manualInputBuffer);
+                     currentState = STATE_PROCESSING;
+                     strcpy(statusMessage, "AI Processing...");
+                     strcpy(procData.songname, songTitle);
+                     procData.is_done = false;
+                     pthread_create(&playback_thread, NULL, proc_thread_func, &procData);
+                 }
+             }
+        }
+        else if (currentState == STATE_PROCESSING) {
+            DrawTextCentered(customFont, "Generating Backing Track...", center, h * 0.35f, 30 * scale, DARKGRAY);
+            DrawTextCentered(customFont, "Please Wait", center, h * 0.45f, 25 * scale, GRAY);
+             
+            // Simple Spinner Animation
+            float time = GetTime();
+            DrawCircleLines(center, h * 0.6f, (40 * scale), Fade(BLUE, 0.5f));
+            DrawCircle(center + cos(time*5)*30*scale, h * 0.6f + sin(time*5)*30*scale, 10*scale, BLUE);
 
-                int result = GuiTextInputBox(boxBounds, 
-                                             "Enter Song Name", 
-                                             "Type the song name to search:", 
-                                             "Search", 
-                                             manualInputBuffer, 
-                                             256, 
-                                             NULL);
-                
-                if (result == 1) {
-                    snprintf(songTitle, sizeof(songTitle), "%s", manualInputBuffer);
-                    showInputBox = false;
-                    currentState = STATE_SEARCHING;
-                    strcpy(statusMessage, "Searching manual entry...");
+            // Check Thread
+            if (procData.is_done) {
+                pthread_join(playback_thread, NULL);
+                if (procData.success) {
+                    currentState = STATE_PLAYING;
+                    strcpy(statusMessage, "Playing Backing Track!");
+                     
+                    if (music_loaded) UnloadMusicStream(curr_music);
+                    curr_music = LoadMusicStream("backing_track.mp3");
+                    PlayMusicStream(curr_music);
+                    music_loaded = true;
+                } else {
+                    currentState = STATE_ERROR;
+                    strcpy(statusMessage, "Processing Failed.");
                 }
             }
-        }
-        else if (currentState == STATE_SEARCHING) {
-            DrawTextCentered(customFont, "Searching Web...", center, h * 0.3f, titleSize, ORANGE);
-            EndDrawing();
-
-            found_url = get_midi_url_from_python(songTitle);
-            if (found_url == NULL) {
-                currentState = STATE_MANUAL_INPUT;
-                strcpy(statusMessage, "MIDI not found. Try a different name.");
-                showInputBox = true;
-            } else {
-                currentState = STATE_DOWNLOADING;
-                strcpy(statusMessage, "Downloading MIDI...");
-            }
-            continue;
-        }
-        else if (currentState == STATE_DOWNLOADING) {
-            DrawTextCentered(customFont, "Downloading...",  center, h * 0.3f, titleSize, ORANGE);
-            EndDrawing();
-
-            printf("DEBUG: Downloading Midi file");
-            if (download_file(found_url, DOWNLOADED_MIDI) != 0) {
-                currentState = STATE_ERROR;
-                strcpy(statusMessage, "Download Failed.");
-            } 
-            else {
-                currentState = STATE_PLAYING;
-                strcpy(statusMessage, "Starting Playback...");
-                
-                // CONFIGURE PLAYBACK THREAD VARS
-                printf("DEBUG: Configuring playback thread");
-                strcpy(audioData.soundfont, SOUNDFONT_FILE);
-                strcpy(audioData.midi_file, DOWNLOADED_MIDI);                
-                
-                // RUN PLAYBACK THREAD
-                audioData.stop_flag = false;
-                audioData.is_running = true; //set this to true before creating the thread to avoid race condition
-                printf("DEBUG: Running playback thread");
-                if (pthread_create(&playbackThread, NULL, audio_thread_func, &audioData) != 0) {
-                     currentState = STATE_ERROR;
-                     strcpy(statusMessage, "Failed to create audio thread.");
-                }
-            }
-            free(found_url);
-            continue;
         }
         else if (currentState == STATE_PLAYING) {
-            DrawTextCentered(customFont, "Now Playing:", center, h * 0.3f, subSize, DARKGRAY);
-            DrawTextCentered(customFont, songTitle, center, h * 0.4f, titleSize, MAROON);
-            // DrawTextCentered(customFont, "(Piano Track Muted)", center, h * 0.5f, 20, GRAY);
-
-// 1. Calculate Position (Bottom-Right Corner)
-            // We subtract from 'w' and 'h' to anchor to the bottom-right
-            float indicatorX = w - (50 * scale); 
-            float indicatorY = h - (60 * scale); // Kept above status bar
+            DrawTextCentered(customFont, "Now Playing:", center, h * 0.3f, 20 * scale, DARKGRAY);
+            DrawTextCentered(customFont, songTitle, center, h * 0.4f, 40 * scale, MAROON);
             
-            // 2. Calculate Radius with Pulse
-            // Base radius 10, pulsing by 3. Multiplied by scale.
             float time = GetTime();
-            float baseRadius = 10.0f * scale;
-            float pulse = (sin(time * 5.0f) * 3.0f) * scale;
-            float finalRadius = baseRadius + pulse;
+            DrawCircle((int)(w - 50*scale), (int)(h - 60*scale), (10 + sin(time*5)*3)*scale, MAROON);
 
-            // 3. Draw Circle
-            DrawCircle((int)indicatorX, (int)indicatorY, finalRadius, MAROON); 
+            GuiSlider((Rectangle){center - 100*scale, h * 0.6f, 200*scale, 20*scale}, 
+                      "Volume", NULL, &volume, 0.0f, 1.0f);
 
-            // 4. Draw Text next to it
-            // "Playing..." text size scaled
-            float labelSize = 14.0f * scale;
-            // Position text to the left of the circle
-            DrawText("Playing...", indicatorX - (70 * scale), indicatorY - (labelSize/2), labelSize, DARKGRAY);
-
-            // Stop Button
-            if (GuiButton((Rectangle){center - 100, h * 0.7f, 200, 50}, GuiIconText(ICON_PLAYER_STOP, "Stop"))) {
-                audioData.stop_flag = true; // Tell thread to stop
+            if (GuiButton((Rectangle){center - 100*scale, h * 0.7f, 200*scale, 50*scale}, 
+                          GuiIconText(ICON_PLAYER_STOP, "Stop"))) {
+                StopMusicStream(curr_music);
                 currentState = STATE_IDLE;
-                strcpy(statusMessage, "Stopping...");
-            }
-            
-            
-            // Cleanup thread if not already
-            if (!audioData.is_running) {
-                pthread_join(playbackThread, NULL);
-                currentState = STATE_IDLE;
-                strcpy(statusMessage, "Ready.");
             }
         }
         else if (currentState == STATE_ERROR) {
@@ -303,12 +233,11 @@ int main() {
         EndDrawing();
     }
 
-    if (audioData.is_running) {
-        audioData.stop_flag = true;
-        pthread_join(playbackThread, NULL);
-    }
-    UnloadFont(customFont);
-    CloseWindow();
+    if (music_loaded) 
+        UnloadMusicStream(curr_music);
 
+    UnloadFont(customFont);
+    CloseAudioDevice();
+    CloseWindow();
     return 0;
 }
