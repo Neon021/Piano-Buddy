@@ -35,6 +35,10 @@ int libraryCount = 0;
 int selectedSongIndex = -1;
 int scrollIndex = 0;
 
+bool stemVocals = true;
+bool stemDrums = true;
+bool stemBass = true;
+bool stemOther = true;
 // The function that runs in the background thread
 void* proc_thread_func(void* arg) {
     printf("DEBUG: proc_thread_func function start");
@@ -147,19 +151,25 @@ int main() {
                 if (GuiButton(itemRect, librarySongs[i])) {
                     snprintf(songTitle, sizeof(songTitle), "%s", librarySongs[i]);
                     
-                    char path[512];
-                    snprintf(path, sizeof(path), "library/%s/backing_track.mp3", librarySongs[i]);
-                    
-                    if (access(path, F_OK) == 0) {
+                    strcpy(statusMessage, "Mixing audio stems...");
+                    // Force a draw so user sees the message
+                    BeginDrawing(); 
+                        ClearBackground(RAYWHITE);
+                        DrawTextCentered(customFont, "Mixing...", w/2, h/2, 40*scale, DARKGRAY);
+                    EndDrawing();
+
+                    // 1. Generate the Mix on the fly
+                    if (create_temp_mix(songTitle, stemVocals, stemDrums, stemBass, stemOther) == 0) {
                         currentState = STATE_PLAYING;
-                        strcpy(statusMessage, "Loaded from Library.");
-                        if (music_loaded) 
-                            UnloadMusicStream(curr_music);
-                        curr_music = LoadMusicStream(path);
+                        strcpy(statusMessage, "Playing custom mix.");
+                        
+                        if (music_loaded) UnloadMusicStream(curr_music);
+                        // Always load the generic session file
+                        curr_music = LoadMusicStream("current_session_mix.mp3"); 
                         PlayMusicStream(curr_music);
                         music_loaded = true;
                     } else {
-                        strcpy(statusMessage, "Error: File missing!");
+                        strcpy(statusMessage, "Error: Could not mix stems.");
                     }
                 }
             }
@@ -233,22 +243,24 @@ int main() {
             DrawCircle(center + cos(time*5)*30*scale, h * 0.6f + sin(time*5)*30*scale, 10*scale, BLUE);
 
             // Check Thread
-            if (procData.is_done) {
-                pthread_join(playback_thread, NULL);
-                if (procData.success) {
-                    currentState = STATE_PLAYING;
-                    strcpy(statusMessage, "Playing Backing Track!");
+                if (procData.is_done) {
+                    pthread_join(playback_thread, NULL);
+                    if (procData.success) {
+                        // 1. Generate Mix immediately
+                        create_temp_mix(songTitle, stemVocals, stemDrums, stemBass, stemOther);
                      
-                    RefreshLibrary();
-                    if (music_loaded) 
-                        UnloadMusicStream(curr_music);
-                    curr_music = LoadMusicStream("backing_track.mp3");
-                    PlayMusicStream(curr_music);
-                    music_loaded = true;
-                } else {
-                    currentState = STATE_ERROR;
-                    strcpy(statusMessage, "Processing Failed.");
-                }
+                        currentState = STATE_PLAYING;
+                        strcpy(statusMessage, "Playing Backing Track!");
+                     
+                        RefreshLibrary();
+                     
+                        if (music_loaded) 
+                            UnloadMusicStream(curr_music);
+                        curr_music = LoadMusicStream("current_session_mix.mp3");
+                        PlayMusicStream(curr_music);
+                        music_loaded = true;
+                 }
+                 // ...
             }
         }
         else if (currentState == STATE_PLAYING) {
@@ -257,6 +269,29 @@ int main() {
             
             float time = GetTime();
             DrawCircle((int)(w - 50*scale), (int)(h - 60*scale), (10 + sin(time*5)*3)*scale, MAROON);
+
+            // STEM TOGGLES
+            float toggleY = h * 0.5f;
+            float toggleX = center - (150 * scale);
+            float gap = 80 * scale;
+
+            // Re-Mix Button logic:
+            // Only re-mix if user clicks a specialized "Remix" button, 
+            // otherwise the audio will stutter if we try to do it on every click.
+            GuiCheckBox((Rectangle){toggleX, toggleY, 20*scale, 20*scale}, "Vocals", &stemVocals);
+            GuiCheckBox((Rectangle){toggleX + gap, toggleY, 20*scale, 20*scale}, "Drums", &stemDrums);
+            GuiCheckBox((Rectangle){toggleX + gap*2, toggleY, 20*scale, 20*scale}, "Bass", &stemBass);
+            GuiCheckBox((Rectangle){toggleX + gap*3, toggleY, 20*scale, 20*scale}, "Other", &stemOther);
+            
+            if (GuiButton((Rectangle){center - 50*scale, toggleY + 40*scale, 100*scale, 30*scale}, "Remix")) {
+                 StopMusicStream(curr_music);
+                 UnloadMusicStream(curr_music); // Release file lock
+                 
+                 create_temp_mix(songTitle, stemVocals, stemDrums, stemBass, stemOther);
+                 
+                 curr_music = LoadMusicStream("current_session_mix.mp3");
+                 PlayMusicStream(curr_music);
+            }
 
             GuiSlider((Rectangle){center - 100*scale, h * 0.6f, 200*scale, 20*scale}, 
                       "Volume", NULL, &volume, 0.0f, 1.0f);
