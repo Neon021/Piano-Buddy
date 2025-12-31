@@ -168,7 +168,7 @@ int main() {
 
     char manualInputBuffer[256] = {0};
     bool showInputBox = false;
-
+    bool isManualModeSelected = false;
     pthread_t playback_thread;
     // APP LOOP
     while (!WindowShouldClose()) {
@@ -202,10 +202,20 @@ int main() {
         if (currentState == STATE_IDLE) {
             float btnW = 200 * scale;
             float btnH = 60 * scale;
+            float gap = 20 * scale;
             if (GuiButton((Rectangle){(w * 0.25f) - btnW/2, h * 0.4f, btnW, btnH}, 
                           GuiIconText(ICON_PLAYER_RECORD, "Record New"))) {
                 currentState = STATE_RECORDING;
                 strcpy(statusMessage, "Recording audio...");
+            }
+
+            if (GuiButton((Rectangle){(w * 0.25f) - btnW/2, h * 0.4f + btnH + gap, btnW, btnH}, 
+                          GuiIconText(ICON_HAND_POINTER, "Manual Search"))) {
+                currentState = STATE_MANUAL_INPUT;
+                showInputBox = true;
+                isManualModeSelected = true;
+                memset(manualInputBuffer, 0, 256);
+                strcpy(statusMessage, "Enter song name manually.");
             }
 
             //Library List
@@ -288,7 +298,10 @@ int main() {
             continue;
         }
         else if (currentState == STATE_MANUAL_INPUT) {
-            DrawTextCentered(customFont, "Could not identify song.", center, h * 0.3f, titleSize, MAROON);
+            if(isManualModeSelected){
+                DrawTextCentered(customFont, "Could not identify song.", center, h * 0.3f, titleSize, MAROON);
+                isManualModeSelected = false;
+            }
             
             float boxWidth = 300 * scale;
              Rectangle boxBounds = { center - (boxWidth / 2), h * 0.4f, boxWidth, 160 * scale };
